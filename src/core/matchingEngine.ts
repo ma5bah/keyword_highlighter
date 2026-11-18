@@ -79,7 +79,6 @@ export class MatchingEngine {
 
     for (let ruleIndex = 0; ruleIndex < this.compiledRules.length; ruleIndex++) {
       const { rule, regex } = this.compiledRules[ruleIndex];
-      // Reset regex state
       regex.lastIndex = 0;
       let match: RegExpExecArray | null;
 
@@ -102,7 +101,6 @@ export class MatchingEngine {
           ruleIndex,
         });
 
-        // Ensure we advance if regex engine didn't
         if (regex.lastIndex === startIndex) {
           regex.lastIndex++;
         }
@@ -147,8 +145,6 @@ export class MatchingEngine {
       return matches;
     }
 
-    // Sort candidates according to SRS priority rules:
-    // Priority (descending) -> Length (descending) -> Rule order (ascending) -> Start index (ascending)
     matches.sort((a, b) => {
       const pDiff = (b.rule.priority || 0) - (a.rule.priority || 0);
       if (pDiff !== 0) {
@@ -171,7 +167,6 @@ export class MatchingEngine {
     const accepted: T[] = [];
 
     for (const candidate of matches) {
-      // Check collision with already accepted non-overlapping regions
       const overlaps = accepted.some(
         (acc) => candidate.startIndex < acc.endIndex && candidate.endIndex > acc.startIndex
       );
@@ -181,7 +176,6 @@ export class MatchingEngine {
       }
     }
 
-    // Return in document appearance order (startIndex ascending)
     return accepted.sort((a, b) => a.startIndex - b.startIndex);
   }
 

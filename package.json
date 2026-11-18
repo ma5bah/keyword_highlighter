@@ -3,10 +3,11 @@
   "displayName": "Keyword Highlighter",
   "description": "Automatically highlights predefined and custom keywords across editors, Git diffs, and Markdown previews.",
   "version": "1.0.0",
-  "publisher": "antigravity",
+  "publisher": "ma5bah",
+  "icon": "assets/icon.png",
   "license": "MIT",
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.147.0"
   },
   "categories": [
     "Other",
@@ -77,6 +78,7 @@
               "backgroundColor": "#DC2626",
               "color": "auto",
               "fontWeight": "bold",
+              "wholeLine": false,
               "priority": 10
             },
             {
@@ -85,6 +87,7 @@
               "backgroundColor": "#2563EB",
               "color": "auto",
               "fontWeight": "bold",
+              "wholeLine": true,
               "priority": 10
             }
           ],
@@ -203,7 +206,7 @@
     },
     "markdown.itPlugins": [
       {
-        "name": "./out/markdownPlugin.js"
+        "name": "./out/adapters/markdownPlugin.js"
       }
     ]
   },

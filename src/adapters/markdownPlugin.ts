@@ -56,7 +56,6 @@ export default function keywordHighlighterMarkdownPlugin(md: any): any {
       const newChildren: any[] = [];
 
       for (const token of blockToken.children) {
-        // Only target normal text tokens, leave code_inline and html_inline untouched
         if (token.type !== 'text' || !token.content) {
           newChildren.push(token);
           continue;
@@ -74,7 +73,6 @@ export default function keywordHighlighterMarkdownPlugin(md: any): any {
           const matchStart = match.index;
           const matchEnd = matchStart + match[0].length;
 
-          // Text before match
           if (matchStart > lastIndex) {
             const beforeToken = new state.Token('text', '', 0);
             beforeToken.content = content.slice(lastIndex, matchStart);
@@ -85,7 +83,6 @@ export default function keywordHighlighterMarkdownPlugin(md: any): any {
           const matchedRule =
             rules.find((r) => r.text === matchedWord) || rules[0];
 
-          // Opening styled span
           const openSpan = new state.Token('html_inline', '', 0);
           const style = [
             `background-color: ${matchedRule.backgroundColor}`,
@@ -99,12 +96,10 @@ export default function keywordHighlighterMarkdownPlugin(md: any): any {
           openSpan.content = `<span class="keyword-highlight" style="${style}">`;
           newChildren.push(openSpan);
 
-          // Keyword content as text token to ensure markdown-it safe escaping
           const keywordToken = new state.Token('text', '', 0);
           keywordToken.content = matchedWord;
           newChildren.push(keywordToken);
 
-          // Closing span
           const closeSpan = new state.Token('html_inline', '', 0);
           closeSpan.content = '</span>';
           newChildren.push(closeSpan);
@@ -113,7 +108,6 @@ export default function keywordHighlighterMarkdownPlugin(md: any): any {
         }
 
         if (hasMatches) {
-          // Trailing text
           if (lastIndex < content.length) {
             const afterToken = new state.Token('text', '', 0);
             afterToken.content = content.slice(lastIndex);

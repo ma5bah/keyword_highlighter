@@ -1,0 +1,11 @@
+.vscode/**
+.claude/**
+scratch/**
+src/**
+tsconfig.json
+build.sh
+pnpm-lock.yaml
+.gitignore
+AGENTS.md
+CLAUDE.md
+**/*.map

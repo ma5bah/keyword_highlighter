@@ -12,8 +12,8 @@ A Visual Studio Code extension that highlights predefined and custom keywords ac
 
 ## Default Keywords
 
-- `@TODO:` - Red highlight (`#DC2626`)
-- `@CORE:` - Blue highlight (`#2563EB`)
+- `@TODO:` - Red highlight (`#DC2626`), highlights the keyword only (`wholeLine: false`).
+- `@CORE:` - Blue highlight (`#2563EB`), highlights the full containing line (`wholeLine: true`).
 
 ## Commands
 

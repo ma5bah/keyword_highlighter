@@ -53,7 +53,6 @@ export class ThemeManager {
 
     const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-    // Use dark text for light backgrounds (luminance > 0.45), light text for dark backgrounds
     return luminance > 0.45 ? '#1E1E1E' : '#FFFFFF';
   }
 
@@ -65,7 +64,6 @@ export class ThemeManager {
     }
 
     if (this.isHighContrast) {
-      // Provide an accessible high-contrast outline if no border was specified
       return `1px solid ${this.isDarkTheme ? '#FFFFFF' : '#000000'}`;
     }
 
@@ -77,7 +75,6 @@ export class ThemeManager {
   public parseColorToRgb(color: string): [number, number, number] | null {
     const trimmed = color.trim().toLowerCase();
 
-    // Hex formats: #RGB, #RGBA, #RRGGBB, #RRGGBBAA
     if (trimmed.startsWith('#')) {
       const hex = trimmed.slice(1);
       if (hex.length === 3 || hex.length === 4) {
@@ -94,7 +91,6 @@ export class ThemeManager {
       }
     }
 
-    // rgb(r, g, b) or rgba(r, g, b, a)
     const rgbMatch = trimmed.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
     if (rgbMatch) {
       return [
@@ -104,7 +100,6 @@ export class ThemeManager {
       ];
     }
 
-    // Common named colors fallback
     const namedColors: Record<string, [number, number, number]> = {
       red: [255, 0, 0],
       green: [0, 128, 0],
@@ -114,7 +109,7 @@ export class ThemeManager {
       white: [255, 255, 255],
       gray: [128, 128, 128],
       orange: [255, 165, 0],
-      purple: [128, 0, 128],
+      purple: [128, 128, 128],
     };
 
     return namedColors[trimmed] || null;

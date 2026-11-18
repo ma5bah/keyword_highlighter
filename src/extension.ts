@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { ConfigManager } from './configManager';
-import { MatchingEngine } from './matchingEngine';
-import { ThemeManager } from './themeManager';
-import { DecorationAdapter } from './decorationAdapter';
+import { ConfigManager } from './managers/configManager';
+import { MatchingEngine } from './core/matchingEngine';
+import { ThemeManager } from './managers/themeManager';
+import { DecorationAdapter } from './adapters/decorationAdapter';
 
 let outputChannel: vscode.OutputChannel | undefined;
 
@@ -27,7 +27,6 @@ export function activate(context: vscode.ExtensionContext): void {
     themeManager
   );
 
-  // Subscribe to config changes
   context.subscriptions.push(
     configManager.onDidChange((newConfig) => {
       decorationAdapter.updateConfig(newConfig);
@@ -35,7 +34,6 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  // Subscribe to theme changes
   context.subscriptions.push(
     vscode.window.onDidChangeActiveColorTheme((e) => {
       decorationAdapter.updateTheme(e.kind);
@@ -43,7 +41,6 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  // Subscribe to editor events
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (editor) {
@@ -103,7 +100,6 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  // Initial highlight pass across currently visible editors
   decorationAdapter.refreshAllVisibleEditors();
 
   context.subscriptions.push(configManager, decorationAdapter, outputChannel);

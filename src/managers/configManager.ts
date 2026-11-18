@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ExtensionConfig, KeywordRule } from './types';
+import { ExtensionConfig, KeywordRule } from '../core/types';
 
 const DEFAULT_KEYWORDS: KeywordRule[] = [
   {
@@ -9,6 +9,7 @@ const DEFAULT_KEYWORDS: KeywordRule[] = [
     backgroundColor: '#DC2626',
     color: 'auto',
     fontWeight: 'bold',
+    wholeLine: false,
     priority: 10,
   },
   {
@@ -18,6 +19,7 @@ const DEFAULT_KEYWORDS: KeywordRule[] = [
     backgroundColor: '#2563EB',
     color: 'auto',
     fontWeight: 'bold',
+    wholeLine: true,
     priority: 10,
   },
 ];

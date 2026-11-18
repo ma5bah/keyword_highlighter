@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { ExtensionConfig, KeywordRule, KeywordMatch } from './types';
-import { MatchingEngine } from './matchingEngine';
-import { ThemeManager } from './themeManager';
+import { ExtensionConfig, KeywordMatch } from '../core/types';
+import { MatchingEngine } from '../core/matchingEngine';
+import { ThemeManager } from '../managers/themeManager';
 
 // @CORE: Adapter bridging keyword matching logic with VS Code TextEditor decoration APIs
 // @TODO: Test and verify side-by-side Git diff panes, inline diffs, dirty document versions, and editor disposal
@@ -27,7 +27,6 @@ export class DecorationAdapter implements vscode.Disposable {
   // @CORE: Recreate decoration types when settings or color themes change
   // @TODO: Test and verify old decoration cleanup to prevent memory leaks and ghost highlights
   public recreateDecorationTypes(): void {
-    // Dispose previous decoration types
     for (const decType of this.decorationTypes.values()) {
       decType.dispose();
     }
@@ -158,7 +157,6 @@ export class DecorationAdapter implements vscode.Disposable {
       }
     }
 
-    // Apply ranges for each decoration type
     for (const [ruleId, decType] of this.decorationTypes.entries()) {
       const ranges = ruleRangesMap.get(ruleId) || [];
       editor.setDecorations(decType, ranges);
@@ -193,23 +191,19 @@ export class DecorationAdapter implements vscode.Disposable {
   // @CORE: Check file eligibility against size limits, languages, and glob patterns
   // @TODO: Test and verify include/exclude glob precedence and binary or synthetic URIs
   private isDocumentSupported(document: vscode.TextDocument): boolean {
-    // 1. Check file size
     if (this.config.maxFileSizeKB > 0) {
-      // Rough estimation: document character count in KB
       const approxSizeKB = document.getText().length / 1024;
       if (approxSizeKB > this.config.maxFileSizeKB) {
         return false;
       }
     }
 
-    // 2. Check language filter
     if (this.config.languages && this.config.languages.length > 0) {
       if (!this.config.languages.includes('*') && !this.config.languages.includes(document.languageId)) {
         return false;
       }
     }
 
-    // 3. Check exclude / include globs if applicable
     const filePath = document.uri.fsPath;
     if (filePath && this.config.exclude && this.config.exclude.length > 0) {
       for (const pattern of this.config.exclude) {
@@ -235,7 +229,6 @@ export class DecorationAdapter implements vscode.Disposable {
     return true;
   }
 
-  // Simple glob matching utility
   private matchGlob(str: string, pattern: string): boolean {
     const regexPattern = pattern
       .replace(/\./g, '\\.')

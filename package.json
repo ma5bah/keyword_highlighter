@@ -1,0 +1,220 @@
+{
+  "name": "keyword-highlighter",
+  "displayName": "Keyword Highlighter",
+  "description": "Automatically highlights predefined and custom keywords across editors, Git diffs, and Markdown previews.",
+  "version": "1.0.0",
+  "publisher": "antigravity",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other",
+    "Linters"
+  ],
+  "main": "./out/extension.js",
+  "browser": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "keywordHighlighter.enable",
+        "title": "Keyword Highlighter: Enable"
+      },
+      {
+        "command": "keywordHighlighter.disable",
+        "title": "Keyword Highlighter: Disable"
+      },
+      {
+        "command": "keywordHighlighter.toggle",
+        "title": "Keyword Highlighter: Toggle"
+      },
+      {
+        "command": "keywordHighlighter.refresh",
+        "title": "Keyword Highlighter: Refresh Highlights"
+      },
+      {
+        "command": "keywordHighlighter.openSettings",
+        "title": "Keyword Highlighter: Open Settings"
+      }
+    ],
+    "configuration": {
+      "title": "Keyword Highlighter",
+      "properties": {
+        "keywordHighlighter.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Globally enable or disable Keyword Highlighter."
+        },
+        "keywordHighlighter.caseSensitive": {
+          "type": "boolean",
+          "default": true,
+          "description": "Default case sensitivity for keyword matching."
+        },
+        "keywordHighlighter.adaptiveContrast": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically compute legible foreground color based on theme and highlight background."
+        },
+        "keywordHighlighter.highlightMode": {
+          "type": "string",
+          "enum": [
+            "keyword",
+            "wholeLine"
+          ],
+          "default": "keyword",
+          "description": "Default highlighting style mode across keywords."
+        },
+        "keywordHighlighter.keywords": {
+          "type": "array",
+          "description": "Configured keyword rules and styling definitions.",
+          "default": [
+            {
+              "text": "@TODO:",
+              "enabled": true,
+              "backgroundColor": "#DC2626",
+              "color": "auto",
+              "fontWeight": "bold",
+              "priority": 10
+            },
+            {
+              "text": "@CORE:",
+              "enabled": true,
+              "backgroundColor": "#2563EB",
+              "color": "auto",
+              "fontWeight": "bold",
+              "priority": 10
+            }
+          ],
+          "items": {
+            "type": "object",
+            "required": [
+              "text"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "Literal keyword or regular expression pattern to match."
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Enable or disable this specific keyword rule."
+              },
+              "color": {
+                "type": "string",
+                "default": "auto",
+                "description": "Text foreground color or 'auto' for adaptive contrast."
+              },
+              "backgroundColor": {
+                "type": "string",
+                "default": "#DC2626",
+                "description": "Highlight background color."
+              },
+              "fontWeight": {
+                "type": "string",
+                "enum": [
+                  "normal",
+                  "bold"
+                ],
+                "default": "bold",
+                "description": "Font weight of the highlighted text."
+              },
+              "fontStyle": {
+                "type": "string",
+                "enum": [
+                  "normal",
+                  "italic"
+                ],
+                "default": "normal",
+                "description": "Font style of the highlighted text."
+              },
+              "borderColor": {
+                "type": "string",
+                "description": "Optional outline or border color."
+              },
+              "borderRadius": {
+                "type": "string",
+                "default": "2px",
+                "description": "Corner radius for background highlight."
+              },
+              "wholeLine": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether to highlight the entire containing line."
+              },
+              "priority": {
+                "type": "integer",
+                "default": 10,
+                "description": "Precedence when rules overlap (higher values take precedence)."
+              },
+              "isRegex": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether the text pattern should be treated as a regular expression."
+              },
+              "wholeWord": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether to match on whole word boundaries only."
+              }
+            }
+          }
+        },
+        "keywordHighlighter.markdownPreview": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable keyword highlighting inside VS Code built-in Markdown preview."
+        },
+        "keywordHighlighter.include": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "File glob patterns to specifically include for scanning."
+        },
+        "keywordHighlighter.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "File glob patterns to exclude from scanning."
+        },
+        "keywordHighlighter.languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "*"
+          ],
+          "description": "Language IDs to highlight (or '*' for all languages)."
+        },
+        "keywordHighlighter.maxFileSizeKB": {
+          "type": "number",
+          "default": 2048,
+          "description": "Maximum file size in KB eligible for keyword scanning."
+        }
+      }
+    },
+    "markdown.itPlugins": [
+      {
+        "name": "./out/markdownPlugin.js"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^16.18.0",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^5.0.0"
+  }
+}

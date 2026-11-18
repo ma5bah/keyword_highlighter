@@ -124,3 +124,7 @@ export default function keywordHighlighterMarkdownPlugin(md: any): any {
 
   return md;
 }
+
+// Support both CommonJS require(plugin) and require(plugin).default in VS Code markdown-it loaders
+module.exports = keywordHighlighterMarkdownPlugin;
+module.exports.default = keywordHighlighterMarkdownPlugin;

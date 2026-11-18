@@ -11,7 +11,7 @@ export class DecorationAdapter implements vscode.Disposable {
   private themeManager: ThemeManager;
   private decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map();
   private debounceTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
-  private matchCache: Map<string, { version: number; matches: KeywordMatch[] }> = new Map();
+  private matchCache: Map<string, { version: number; length: number; matches: KeywordMatch[] }> = new Map();
 
   constructor(
     config: ExtensionConfig,
@@ -51,8 +51,14 @@ export class DecorationAdapter implements vscode.Disposable {
       const border = this.themeManager.resolveBorder(rule.borderColor, rule.backgroundColor);
       const isWholeLine = rule.wholeLine || this.config.highlightMode === 'wholeLine';
 
+      // For whole-line highlights, use a translucent tint to avoid obscuring Git diff additions/deletions
+      let backgroundColor = rule.backgroundColor || '#DC2626';
+      if (isWholeLine) {
+        backgroundColor = this.themeManager.toRgbaString(backgroundColor, 0.28);
+      }
+
       const renderOptions: vscode.DecorationRenderOptions = {
-        backgroundColor: rule.backgroundColor || '#DC2626',
+        backgroundColor: backgroundColor,
         color: foreground,
         fontWeight: rule.fontWeight || 'bold',
         fontStyle: rule.fontStyle || 'normal',
@@ -99,7 +105,8 @@ export class DecorationAdapter implements vscode.Disposable {
       return;
     }
 
-    const key = editor.document.uri.toString();
+    // Key by URI + viewColumn to prevent split diff panes from cancelling each other
+    const key = `${editor.document.uri.toString()}#${editor.viewColumn ?? 0}`;
     const existingTimer = this.debounceTimers.get(key);
     if (existingTimer) {
       clearTimeout(existingTimer);
@@ -108,12 +115,34 @@ export class DecorationAdapter implements vscode.Disposable {
 
     if (immediate) {
       this.decorateEditor(editor);
+      this.scheduleAsyncDiffRetries(editor);
     } else {
       const timer = setTimeout(() => {
         this.debounceTimers.delete(key);
         this.decorateEditor(editor);
+        this.scheduleAsyncDiffRetries(editor);
       }, 75);
       this.debounceTimers.set(key, timer);
+    }
+  }
+
+  // @CORE: Schedule asynchronous retries for Git virtual documents whose contents populate after initial opening
+  // @TODO: Test and verify git diffs loaded from remote or slow source control providers
+  private scheduleAsyncDiffRetries(editor: vscode.TextEditor): void {
+    if (!editor || !editor.document || editor.document.uri.scheme !== 'git') {
+      return;
+    }
+
+    // Git diff original pane often loads content after onDidChangeVisibleTextEditors
+    const retries = [100, 300, 800];
+    for (const delay of retries) {
+      setTimeout(() => {
+        for (const visible of vscode.window.visibleTextEditors) {
+          if (visible === editor || visible.document.uri.toString() === editor.document.uri.toString()) {
+            this.decorateEditor(visible);
+          }
+        }
+      }, delay);
     }
   }
 
@@ -157,17 +186,25 @@ export class DecorationAdapter implements vscode.Disposable {
       }
     }
 
-    for (const [ruleId, decType] of this.decorationTypes.entries()) {
-      const ranges = ruleRangesMap.get(ruleId) || [];
-      editor.setDecorations(decType, ranges);
+    try {
+      for (const [ruleId, decType] of this.decorationTypes.entries()) {
+        const ranges = ruleRangesMap.get(ruleId) || [];
+        editor.setDecorations(decType, ranges);
+      }
+    } catch {
+      // Safely ignore editors closed during decoration
     }
   }
 
   // @CORE: Clear all active decorations from an editor
   // @TODO: Test and verify cleanup on document close or extension disable
   public clearEditorDecorations(editor: vscode.TextEditor): void {
-    for (const decType of this.decorationTypes.values()) {
-      editor.setDecorations(decType, []);
+    try {
+      for (const decType of this.decorationTypes.values()) {
+        editor.setDecorations(decType, []);
+      }
+    } catch {
+      // Safely ignore already closed editors
     }
   }
 
@@ -175,22 +212,45 @@ export class DecorationAdapter implements vscode.Disposable {
   // @TODO: Test and verify cache invalidation on text edits and multiple editors viewing same file
   private getOrComputeMatches(document: vscode.TextDocument): KeywordMatch[] {
     const uriKey = document.uri.toString();
-    const version = document.version;
-    const cached = this.matchCache.get(uriKey);
+    const isGit = document.uri.scheme === 'git';
+    const text = document.getText();
+    const currentLen = text.length;
 
-    if (cached && cached.version === version) {
-      return cached.matches;
+    // Do not use stale cache for git virtual documents whose text was loaded asynchronously
+    if (!isGit) {
+      const cached = this.matchCache.get(uriKey);
+      if (cached && cached.version === document.version && cached.length === currentLen) {
+        return cached.matches;
+      }
     }
 
-    const text = document.getText();
     const matches = this.matchingEngine.findMatches(text);
-    this.matchCache.set(uriKey, { version, matches });
+
+    if (currentLen > 0) {
+      this.matchCache.set(uriKey, {
+        version: document.version,
+        length: currentLen,
+        matches,
+      });
+    }
+
     return matches;
   }
 
   // @CORE: Check file eligibility against size limits, languages, and glob patterns
   // @TODO: Test and verify include/exclude glob precedence and binary or synthetic URIs
   private isDocumentSupported(document: vscode.TextDocument): boolean {
+    if (!document) {
+      return false;
+    }
+
+    const scheme = document.uri.scheme;
+    // Whitelist common text editing schemes and ignore system/output schemes
+    const ignoredSchemes = ['output', 'debug', 'vscode-settings', 'walkThrough'];
+    if (ignoredSchemes.includes(scheme)) {
+      return false;
+    }
+
     if (this.config.maxFileSizeKB > 0) {
       const approxSizeKB = document.getText().length / 1024;
       if (approxSizeKB > this.config.maxFileSizeKB) {
@@ -198,25 +258,30 @@ export class DecorationAdapter implements vscode.Disposable {
       }
     }
 
-    if (this.config.languages && this.config.languages.length > 0) {
-      if (!this.config.languages.includes('*') && !this.config.languages.includes(document.languageId)) {
+    // Language filter: in Git diffs, languageId can temporarily be 'git' or 'diff'
+    if (this.config.languages && this.config.languages.length > 0 && !this.config.languages.includes('*')) {
+      const isAllowedLanguage =
+        this.config.languages.includes(document.languageId) ||
+        (scheme === 'git' && (document.languageId === 'git' || document.languageId === 'diff'));
+
+      if (!isAllowedLanguage) {
         return false;
       }
     }
 
-    const filePath = document.uri.fsPath;
-    if (filePath && this.config.exclude && this.config.exclude.length > 0) {
+    const checkPath = document.uri.fsPath || document.uri.path;
+    if (checkPath && this.config.exclude && this.config.exclude.length > 0) {
       for (const pattern of this.config.exclude) {
-        if (this.matchGlob(filePath, pattern)) {
+        if (this.matchGlob(checkPath, pattern)) {
           return false;
         }
       }
     }
 
-    if (filePath && this.config.include && this.config.include.length > 0) {
+    if (checkPath && this.config.include && this.config.include.length > 0) {
       let included = false;
       for (const pattern of this.config.include) {
-        if (this.matchGlob(filePath, pattern)) {
+        if (this.matchGlob(checkPath, pattern)) {
           included = true;
           break;
         }

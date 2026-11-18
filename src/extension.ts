@@ -52,15 +52,39 @@ export function activate(context: vscode.ExtensionContext): void {
     // @TODO: Test and verify diff editor split-screen views and Git staging panes
     vscode.window.onDidChangeVisibleTextEditors((editors) => {
       for (const editor of editors) {
-        decorationAdapter.triggerUpdate(editor, false);
+        decorationAdapter.triggerUpdate(editor, true);
+      }
+    }),
+
+    // @CORE: Detect newly opened virtual documents (such as Git HEAD revisions in diff panes)
+    // @TODO: Test and verify onDidOpenTextDocument timing for git: and diff: schemes
+    vscode.workspace.onDidOpenTextDocument((doc) => {
+      for (const editor of vscode.window.visibleTextEditors) {
+        if (editor.document.uri.toString() === doc.uri.toString()) {
+          decorationAdapter.triggerUpdate(editor, true);
+        }
       }
     }),
 
     vscode.workspace.onDidChangeTextDocument((event) => {
       for (const editor of vscode.window.visibleTextEditors) {
-        if (editor.document === event.document) {
+        if (editor.document.uri.toString() === event.document.uri.toString()) {
           decorationAdapter.triggerUpdate(editor, false);
         }
+      }
+    }),
+
+    // @CORE: Re-verify highlights when diff views scroll, collapse, or switch between inline and side-by-side
+    // @TODO: Test and verify inline diff gutter expansion and fast scrolling
+    vscode.window.onDidChangeTextEditorVisibleRanges((event) => {
+      decorationAdapter.triggerUpdate(event.textEditor, false);
+    }),
+
+    // @CORE: Refresh when window regains focus after external Git operations (e.g. checkout, rebase)
+    // @TODO: Test and verify focus recovery after terminal git commands
+    vscode.window.onDidChangeWindowState((state) => {
+      if (state.focused) {
+        decorationAdapter.refreshAllVisibleEditors();
       }
     })
   );

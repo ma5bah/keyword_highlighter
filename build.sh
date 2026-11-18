@@ -3,7 +3,7 @@ set -e
 
 echo "=== Building Keyword Highlighter ==="
 
-# 1. Install dependencies with pnpm
+# 1. Install dependencies
 echo "Installing dependencies..."
 pnpm install
 
@@ -11,5 +11,9 @@ pnpm install
 echo "Compiling TypeScript..."
 pnpm run compile
 
-echo "=== Build complete ==="
-echo "Output files generated in ./out"
+# 3. Package extension into .vsix
+echo "Packaging .vsix..."
+npx --yes @vscode/vsce package --no-dependencies --allow-missing-repository --skip-license
+
+echo "=== Build and packaging complete ==="
+echo "Package generated: keyword-highlighter-1.0.0.vsix"

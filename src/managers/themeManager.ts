@@ -70,6 +70,16 @@ export class ThemeManager {
     return undefined;
   }
 
+  // @CORE: Convert hex/named color to rgba string with custom alpha for non-intrusive diff and whole-line highlights
+  // @TODO: Test and verify alpha blending over Git diff green/red line backgrounds
+  public toRgbaString(color: string, alpha: number = 0.25): string {
+    const rgb = this.parseColorToRgb(color);
+    if (!rgb) {
+      return color;
+    }
+    return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+  }
+
   // @CORE: Parse hexadecimal, rgb, and standard named colors into RGB tuples
   // @TODO: Test and verify malformed strings, alpha channels, and unsupported color syntax
   public parseColorToRgb(color: string): [number, number, number] | null {

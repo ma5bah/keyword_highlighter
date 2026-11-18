@@ -44,4 +44,7 @@ export interface ExtensionConfig {
   exclude: string[];
   languages: string[];
   maxFileSizeKB: number;
+  commentOnly: boolean;
+  gitDiffChangedLinesOnly: boolean;
+  overviewRuler: boolean;
 }

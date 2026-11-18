@@ -1,130 +1,94 @@
-// @CORE: Markdown-it plugin extending VS Code built-in Markdown preview with keyword highlighting
-// @TODO: Test and verify headings, lists, tables, blockquotes, code fences, and inline code spans
+import { MatchingEngine } from '../core/matchingEngine';
+import { ExtensionConfig, KeywordRule } from '../core/types';
+import { ThemeManager } from '../managers/themeManager';
 
-interface RuleConfig {
-  text: string;
-  backgroundColor: string;
-  color: string;
-  fontWeight: string;
-  fontStyle: string;
-  borderRadius: string;
-  borderColor?: string;
+// @CORE: Apply the current configured keyword matcher to Markdown text tokens
+// @TODO: Test and verify preview rendering, sanitization, rule changes, and preserved Markdown constructs
+function safeColor(value: string | undefined, fallback: string): string {
+  return value && /^(#[0-9a-f]{3,8}|(?:rgb|rgba|hsl|hsla)\([0-9.% ,/+-]+\))$/i.test(value)
+    ? value
+    : fallback;
 }
 
-const DEFAULT_MARKDOWN_RULES: RuleConfig[] = [
-  {
-    text: '@TODO:',
-    backgroundColor: '#DC2626',
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontStyle: 'normal',
-    borderRadius: '2px',
-  },
-  {
-    text: '@CORE:',
-    backgroundColor: '#2563EB',
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontStyle: 'normal',
-    borderRadius: '2px',
-  },
-];
-
-// @CORE: Escape special regex characters in literal keywords
-// @TODO: Test and verify punctuation characters in keyword strings
-function escapeRegex(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function safeRadius(value: string | undefined): string {
+  return value && /^\d{1,3}(?:\.\d{1,2})?(?:px|em|rem|%)$/.test(value) ? value : '2px';
 }
 
-// @CORE: Main markdown-it plugin entry point contributing to VS Code Markdown preview
-// @TODO: Test and verify security boundaries, preserving HTML sanitation, and performance in long markdown docs
-export default function keywordHighlighterMarkdownPlugin(md: any): any {
+function safeRule(rule: KeywordRule): KeywordRule {
+  return {
+    ...rule,
+    backgroundColor: safeColor(rule.backgroundColor, '#DC2626'),
+    color: rule.color === 'auto' ? '#FFFFFF' : safeColor(rule.color, '#FFFFFF'),
+    borderColor: rule.borderColor ? safeColor(rule.borderColor, '') : undefined,
+    fontWeight: rule.fontWeight === 'normal' ? 'normal' : 'bold',
+    fontStyle: rule.fontStyle === 'italic' ? 'italic' : 'normal',
+    borderRadius: safeRadius(rule.borderRadius),
+  };
+}
+
+// @CORE: VS Code Markdown API plugin entry point; returns the supplied markdown-it instance
+// @TODO: Test and verify escaped HTML, inline code, links, lists, and live configuration refresh
+export function keywordHighlighterMarkdownPlugin(md: any, getState: () => { config: ExtensionConfig; engine: MatchingEngine; theme: ThemeManager }): any {
   md.core.ruler.push('keyword_highlighter', (state: any) => {
-    const rules = DEFAULT_MARKDOWN_RULES;
-    if (!rules || rules.length === 0) {
+    const { config, engine, theme } = getState();
+    if (!config.enabled || !config.markdownPreview) {
       return;
     }
 
-    const patternString = rules.map((r) => escapeRegex(r.text)).join('|');
-    const regex = new RegExp(`(${patternString})`, 'g');
-
-    for (const blockToken of state.tokens) {
-      if (blockToken.type !== 'inline' || !blockToken.children) {
-        continue;
-      }
-
-      const newChildren: any[] = [];
-
-      for (const token of blockToken.children) {
+    for (const block of state.tokens) {
+      if (block.type !== 'inline' || !block.children) continue;
+      const children: any[] = [];
+      for (const token of block.children) {
+        // Only text tokens are changed. Code, links, and existing inline markup retain their token structure.
         if (token.type !== 'text' || !token.content) {
-          newChildren.push(token);
+          children.push(token);
           continue;
         }
-
         const content: string = token.content;
-        regex.lastIndex = 0;
-
-        let lastIndex = 0;
-        let match: RegExpExecArray | null;
-        let hasMatches = false;
-
-        while ((match = regex.exec(content)) !== null) {
-          hasMatches = true;
-          const matchStart = match.index;
-          const matchEnd = matchStart + match[0].length;
-
-          if (matchStart > lastIndex) {
-            const beforeToken = new state.Token('text', '', 0);
-            beforeToken.content = content.slice(lastIndex, matchStart);
-            newChildren.push(beforeToken);
-          }
-
-          const matchedWord = match[0];
-          const matchedRule =
-            rules.find((r) => r.text === matchedWord) || rules[0];
-
-          const openSpan = new state.Token('html_inline', '', 0);
-          const style = [
-            `background-color: ${matchedRule.backgroundColor}`,
-            `color: ${matchedRule.color}`,
-            `font-weight: ${matchedRule.fontWeight}`,
-            `font-style: ${matchedRule.fontStyle}`,
-            `border-radius: ${matchedRule.borderRadius}`,
-            'padding: 1px 3px',
-            'display: inline-block',
-          ].join('; ');
-          openSpan.content = `<span class="keyword-highlight" style="${style}">`;
-          newChildren.push(openSpan);
-
-          const keywordToken = new state.Token('text', '', 0);
-          keywordToken.content = matchedWord;
-          newChildren.push(keywordToken);
-
-          const closeSpan = new state.Token('html_inline', '', 0);
-          closeSpan.content = '</span>';
-          newChildren.push(closeSpan);
-
-          lastIndex = matchEnd;
+        const matches = engine.findMatches(content);
+        if (!matches.length) {
+          children.push(token);
+          continue;
         }
-
-        if (hasMatches) {
-          if (lastIndex < content.length) {
-            const afterToken = new state.Token('text', '', 0);
-            afterToken.content = content.slice(lastIndex);
-            newChildren.push(afterToken);
+        let offset = 0;
+        for (const match of matches) {
+          if (match.startIndex > offset) {
+            const before = new state.Token('text', '', 0);
+            before.content = content.slice(offset, match.startIndex);
+            children.push(before);
           }
-        } else {
-          newChildren.push(token);
+          const rule = safeRule(match.rule);
+          if (config.adaptiveContrast && match.rule.color === 'auto') {
+            rule.color = theme.resolveForegroundColor(rule.backgroundColor, 'auto');
+          }
+          const styles = [
+            `background-color:${rule.backgroundColor}`,
+            `color:${rule.color}`,
+            `font-weight:${rule.fontWeight}`,
+            `font-style:${rule.fontStyle}`,
+            `border-radius:${rule.borderRadius}`,
+            ...(rule.borderColor ? [`border:1px solid ${rule.borderColor}`] : []),
+            'padding:1px 3px',
+          ].join(';');
+          const open = new state.Token('html_inline', '', 0);
+          open.content = `<span class="keyword-highlight" style="${styles}">`;
+          children.push(open);
+          const highlighted = new state.Token('text', '', 0);
+          highlighted.content = match.matchedText;
+          children.push(highlighted);
+          const close = new state.Token('html_inline', '', 0);
+          close.content = '</span>';
+          children.push(close);
+          offset = match.endIndex;
+        }
+        if (offset < content.length) {
+          const after = new state.Token('text', '', 0);
+          after.content = content.slice(offset);
+          children.push(after);
         }
       }
-
-      blockToken.children = newChildren;
+      block.children = children;
     }
   });
-
   return md;
 }
-
-// Support both CommonJS require(plugin) and require(plugin).default in VS Code markdown-it loaders
-module.exports = keywordHighlighterMarkdownPlugin;
-module.exports.default = keywordHighlighterMarkdownPlugin;

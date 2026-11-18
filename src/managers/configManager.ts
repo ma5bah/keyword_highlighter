@@ -28,6 +28,7 @@ const DEFAULT_KEYWORDS: KeywordRule[] = [
 // @TODO: Test and verify user/workspace settings precedence, empty rule lists, and invalid type coercion
 export class ConfigManager implements vscode.Disposable {
   private config: ExtensionConfig;
+  private keywordWrite: Promise<void> = Promise.resolve();
   private disposables: vscode.Disposable[] = [];
   private onDidChangeEmitter = new vscode.EventEmitter<ExtensionConfig>();
 
@@ -60,6 +61,9 @@ export class ConfigManager implements vscode.Disposable {
     const exclude = wsConfig.get<string[]>('exclude', []);
     const languages = wsConfig.get<string[]>('languages', ['*']);
     const maxFileSizeKB = wsConfig.get<number>('maxFileSizeKB', 2048);
+    const commentOnly = wsConfig.get<boolean>('commentOnly', false);
+    const gitDiffChangedLinesOnly = wsConfig.get<boolean>('gitDiffChangedLinesOnly', false);
+    const overviewRuler = wsConfig.get<boolean>('overviewRuler', true);
 
     const rawKeywords = wsConfig.get<any[]>('keywords', []);
     const keywords = this.normalizeKeywords(rawKeywords);
@@ -75,6 +79,9 @@ export class ConfigManager implements vscode.Disposable {
       exclude,
       languages,
       maxFileSizeKB,
+      commentOnly,
+      gitDiffChangedLinesOnly,
+      overviewRuler,
     };
   }
 
@@ -116,9 +123,39 @@ export class ConfigManager implements vscode.Disposable {
     return this.config;
   }
 
+  // @CORE: Update enabled state in the effective user or workspace settings scope.
+  // @TODO: Test setting precedence and recovery from rejected configuration writes.
   public async setEnabled(enabled: boolean): Promise<void> {
     const wsConfig = vscode.workspace.getConfiguration('keywordHighlighter');
-    await wsConfig.update('enabled', enabled, vscode.ConfigurationTarget.Global);
+    const inspected = wsConfig.inspect<boolean>('enabled');
+    const target = inspected?.workspaceValue !== undefined
+      ? vscode.ConfigurationTarget.Workspace
+      : vscode.ConfigurationTarget.Global;
+    await wsConfig.update('enabled', enabled, target);
+  }
+
+  // @CORE: Persist selected text as a literal keyword without replacing existing rules
+  // @TODO: Test and verify duplicate detection and preserving explicit empty/default rule configurations
+  public addKeyword(text: string): Promise<boolean> {
+    const operation = this.keywordWrite.then(async () => {
+      const wsConfig = vscode.workspace.getConfiguration('keywordHighlighter');
+      const existing = wsConfig.get<any[]>('keywords', []);
+      const rules = Array.isArray(existing) && existing.length
+        ? [...existing]
+        : this.config.keywords.map(({ id: _id, ...rule }) => ({ ...rule }));
+      if (rules.some((rule) => rule && rule.text === text && rule.isRegex !== true)) {
+        return false;
+      }
+      rules.push({ text, enabled: true, isRegex: false, priority: 10 });
+      const inspected = wsConfig.inspect('keywords');
+      const target = inspected?.workspaceValue !== undefined
+        ? vscode.ConfigurationTarget.Workspace
+        : vscode.ConfigurationTarget.Global;
+      await wsConfig.update('keywords', rules, target);
+      return true;
+    });
+    this.keywordWrite = operation.then(() => undefined, () => undefined);
+    return operation;
   }
 
   public dispose(): void {

@@ -7,14 +7,14 @@
   "icon": "assets/icon.png",
   "license": "MIT",
   "engines": {
-    "vscode": "^1.147.0"
+    "vscode": "^1.146.0"
   },
   "categories": [
     "Other",
     "Linters"
   ],
   "main": "./out/extension.js",
-  "browser": "./out/extension.js",
+  "browser": "./out/web/extension.js",
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -39,6 +39,22 @@
       {
         "command": "keywordHighlighter.openSettings",
         "title": "Keyword Highlighter: Open Settings"
+      },
+      {
+        "command": "keywordHighlighter.nextMatch",
+        "title": "Keyword Highlighter: Next Match"
+      },
+      {
+        "command": "keywordHighlighter.previousMatch",
+        "title": "Keyword Highlighter: Previous Match"
+      },
+      {
+        "command": "keywordHighlighter.addSelection",
+        "title": "Keyword Highlighter: Add Selection as Keyword"
+      },
+      {
+        "command": "keywordHighlighter.refreshWorkspaceMatches",
+        "title": "Keyword Highlighter: Refresh Workspace Matches"
       }
     ],
     "configuration": {
@@ -201,20 +217,90 @@
           "type": "number",
           "default": 2048,
           "description": "Maximum file size in KB eligible for keyword scanning."
+        },
+        "keywordHighlighter.commentOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "Restrict matches to comments."
+        },
+        "keywordHighlighter.gitDiffChangedLinesOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "Restrict Git diff matches to changed lines."
+        },
+        "keywordHighlighter.overviewRuler": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show matches in the overview ruler."
         }
       }
     },
-    "markdown.itPlugins": [
+    "keybindings": [
       {
-        "name": "./out/adapters/markdownPlugin.js"
+        "command": "keywordHighlighter.nextMatch",
+        "key": "ctrl+k alt+n",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "keywordHighlighter.previousMatch",
+        "key": "ctrl+k alt+p",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "keywordHighlighter.nextMatch",
+        "key": "cmd+k alt+n",
+        "when": "editorTextFocus",
+        "mac": "cmd+k alt+n"
+      },
+      {
+        "command": "keywordHighlighter.previousMatch",
+        "key": "cmd+k alt+p",
+        "when": "editorTextFocus",
+        "mac": "cmd+k alt+p"
       }
-    ]
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "keywordHighlighter.addSelection",
+          "when": "editorHasSelection",
+          "group": "navigation@99"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "keywordHighlighter.refreshWorkspaceMatches",
+          "icon": "$(refresh)",
+          "when": "view == keywordHighlighter.matches",
+          "group": "navigation"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "keywordHighlighter",
+          "title": "Keyword Matches",
+          "icon": "assets/icon.png"
+        }
+      ]
+    },
+    "views": {
+      "keywordHighlighter": [
+        {
+          "id": "keywordHighlighter.matches",
+          "name": "Matches"
+        }
+      ]
+    },
+    "markdown.markdownItPlugins": true
   },
   "scripts": {
-    "vscode:prepublish": "pnpm run compile",
+    "vscode:prepublish": "pnpm run bundle",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package --no-dependencies --allow-missing-repository --skip-license"
+    "package": "pnpm dlx @vscode/vsce package --no-dependencies --allow-missing-repository --skip-license",
+    "bundle": "pnpm run compile && pnpm dlx esbuild@0.28.1 src/extension.ts --bundle --platform=browser --format=cjs --external:vscode --target=es2020 --outfile=out/web/extension.js"
   },
   "devDependencies": {},
   "dependencies": {

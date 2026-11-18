@@ -1,4 +1,5 @@
 import { KeywordRule, KeywordMatch } from './types';
+import { CommentRange } from './commentRanges';
 
 // @CORE: Standalone, UI-independent keyword matching engine
 // @TODO: Test and verify exact literal matching, whole-word flags, regex safety, and deterministic overlap arbitration
@@ -54,17 +55,20 @@ export class MatchingEngine {
     return new RegExp(pattern, flags);
   }
 
-  // @CORE: Scan document text and extract all keyword matches with line/char coordinates
-  // @TODO: Test and verify zero-length match avoidance, multibyte UTF-8/UTF-16 characters, and CRLF line breaks
-  public findMatches(text: string): KeywordMatch[] {
+  // @CORE: Scan document text, map match coordinates, and optionally restrict spans to complete comment ranges.
+  // @TODO: Test and verify zero-length matches, UTF-16 offsets, line endings, range boundaries, empty ranges, and unfiltered matching.
+  public findMatches(text: string, allowedRanges?: readonly CommentRange[]): KeywordMatch[] {
     if (!text || this.compiledRules.length === 0) {
       return [];
     }
+    if (allowedRanges !== undefined && allowedRanges.length === 0) return [];
 
     // Precalculate line start offsets for efficient index -> (line, char) conversion
     const lineStarts: number[] = [0];
     for (let i = 0; i < text.length; i++) {
       if (text[i] === '\n') {
+        lineStarts.push(i + 1);
+      } else if (text[i] === '\r' && text[i + 1] !== '\n') {
         lineStarts.push(i + 1);
       }
     }
@@ -80,6 +84,7 @@ export class MatchingEngine {
     for (let ruleIndex = 0; ruleIndex < this.compiledRules.length; ruleIndex++) {
       const { rule, regex } = this.compiledRules[ruleIndex];
       regex.lastIndex = 0;
+      let allowedRangeIndex = 0;
       let match: RegExpExecArray | null;
 
       while ((match = regex.exec(text)) !== null) {
@@ -92,6 +97,16 @@ export class MatchingEngine {
 
         const startIndex = match.index;
         const endIndex = startIndex + matchedText.length;
+
+        while (allowedRanges && allowedRangeIndex < allowedRanges.length &&
+          allowedRanges[allowedRangeIndex].endIndex <= startIndex) {
+          allowedRangeIndex++;
+        }
+        const range = allowedRanges?.[allowedRangeIndex];
+        if (allowedRanges && (!range || startIndex < range.startIndex || endIndex > range.endIndex)) {
+          if (regex.lastIndex === startIndex) regex.lastIndex++;
+          continue;
+        }
 
         rawMatches.push({
           rule,
@@ -131,8 +146,8 @@ export class MatchingEngine {
     });
   }
 
-  // @CORE: Deterministic overlap resolution across matched candidate spans
-  // @TODO: Test and verify exact priority ties, sub-span overlaps, and adjacent non-overlapping spans
+  // @CORE: Deterministically arbitrate overlapping spans using priority, length, then rule order.
+  // @TODO: Test and verify priority ties, nested spans, adjacent spans, and Fenwick prefix boundaries.
   private resolveOverlaps<
     T extends {
       rule: KeywordRule;
@@ -164,15 +179,39 @@ export class MatchingEngine {
       return a.startIndex - b.startIndex;
     });
 
+    const starts = Array.from(new Set(matches.map((match) => match.startIndex))).sort((a, b) => a - b);
+    const startIndexes = new Map(starts.map((start, index) => [start, index + 1]));
+    const fenwick = new Array<number>(starts.length + 1).fill(Number.NEGATIVE_INFINITY);
     const accepted: T[] = [];
 
+    const prefixMaximum = (count: number): number => {
+      let maximum = Number.NEGATIVE_INFINITY;
+      for (let index = count; index > 0; index -= index & -index) {
+        maximum = Math.max(maximum, fenwick[index]);
+      }
+      return maximum;
+    };
+
+    const updateMaximum = (position: number, endIndex: number): void => {
+      for (let index = position; index < fenwick.length; index += index & -index) {
+        fenwick[index] = Math.max(fenwick[index], endIndex);
+      }
+    };
+
     for (const candidate of matches) {
-      const overlaps = accepted.some(
-        (acc) => candidate.startIndex < acc.endIndex && candidate.endIndex > acc.startIndex
-      );
+      // Number of indexed starts strictly before candidate.endIndex.
+      let low = 0;
+      let high = starts.length;
+      while (low < high) {
+        const mid = (low + high) >>> 1;
+        if (starts[mid] < candidate.endIndex) low = mid + 1;
+        else high = mid;
+      }
+      const overlaps = prefixMaximum(low) > candidate.startIndex;
 
       if (!overlaps) {
         accepted.push(candidate);
+        updateMaximum(startIndexes.get(candidate.startIndex)!, candidate.endIndex);
       }
     }
 

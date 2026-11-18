@@ -10,7 +10,7 @@ export class DecorationAdapter implements vscode.Disposable {
   private matchingEngine: MatchingEngine;
   private themeManager: ThemeManager;
   private decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map();
-  private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
+  private debounceTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private matchCache: Map<string, { version: number; matches: KeywordMatch[] }> = new Map();
 
   constructor(

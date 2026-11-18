@@ -16,7 +16,7 @@ Default rules highlight `@TODO:` in red and `@CORE:` in blue across its whole li
 
 ## Requirements
 
-VS Code 1.146.0 or newer. Build prerequisites: Node.js 22 or newer and pnpm. The build resolves pinned esbuild and VSCE through `pnpm dlx`.
+VS Code 1.146.0 or newer. Building requires Node.js 22 or newer and pnpm.
 
 ## Behavior and limits
 
@@ -27,7 +27,9 @@ VS Code 1.146.0 or newer. Build prerequisites: Node.js 22 or newer and pnpm. The
 
 ## Build and install
 
-Run `./build.sh` to install locked dependencies and package an installable `.vsix`. VSCE runs the prepublish bundle once, compiling the desktop entry with TypeScript and producing the browser bundle alongside it. Install it with `code --install-extension keyword-highlighter-1.0.0.vsix`, then reload the VS Code window. Alternatively, use **Extensions: Install from VSIX...** and select the generated package.
+Run `./build.sh` to install locked dependencies and create a `.vsix`. Packaging checks TypeScript and builds one bundle for desktop and web. pnpm reuses cached copies of the pinned esbuild and VSCE tools on repeat runs.
+
+Install with `code --install-extension keyword-highlighter-1.0.0.vsix`, then reload the VS Code window. You can also use **Extensions: Install from VSIX...** and select the package.
 
 ## Commands
 

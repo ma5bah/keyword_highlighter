@@ -2,6 +2,7 @@
 .claude/**
 scratch/**
 src/**
+out/*/**
 tsconfig.json
 build.sh
 pnpm-lock.yaml
